@@ -1,19 +1,47 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
 using LMS.Models;
+using LMS.Repositories;
+using Microsoft.AspNetCore.Mvc;
 
 namespace LMS.Controllers;
 
 public class HomeController : Controller
 {
-    public IActionResult Index()
+    private readonly IBookRepository      _bookRepo;
+    private readonly IReaderRepository    _readerRepo;
+    private readonly IBorrowingRepository _borrowingRepo;
+
+    public HomeController(
+        IBookRepository bookRepo,
+        IReaderRepository readerRepo,
+        IBorrowingRepository borrowingRepo)
     {
-        return View();
+        _bookRepo      = bookRepo;
+        _readerRepo    = readerRepo;
+        _borrowingRepo = borrowingRepo;
     }
 
-    public IActionResult Privacy()
+    // GET: /  (Dashboard)
+    public IActionResult Index()
     {
-        return View();
+        if (HttpContext.Session.GetString("Username") is null)
+            return RedirectToAction("Login", "Account");
+
+        var borrowings = _borrowingRepo.GetAll().ToList();
+
+        ViewBag.TotalBooks        = _bookRepo.GetAll().Count();
+        ViewBag.AvailableBooks    = _bookRepo.GetAll().Count(b => b.IsAvailable);
+        ViewBag.TotalReaders      = _readerRepo.GetAll().Count();
+        ViewBag.ActiveBorrowings  = borrowings.Count(b => !b.IsReturned);
+        ViewBag.OverdueBorrowings = borrowings.Count(b => !b.IsReturned && b.DueDate < DateTime.Today);
+
+        var recent = borrowings
+            .OrderByDescending(b => b.BorrowDate)
+            .Take(5)
+            .Select(b => { b.Book = _bookRepo.GetById(b.BookId); b.Reader = _readerRepo.GetById(b.ReaderId); return b; })
+            .ToList();
+
+        return View(recent);
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

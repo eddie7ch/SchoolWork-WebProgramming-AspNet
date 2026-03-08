@@ -1,0 +1,66 @@
+@model IEnumerable<Borrowing>
+@{
+    ViewData["Title"] = "Borrowings";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">🔄 Borrowings</h2>
+    <a asp-action="Create" class="btn btn-primary">+ New Borrowing</a>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">No borrowing records found. <a asp-action="Create">Create the first one</a>.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Book</th>
+                    <th>Reader</th>
+                    <th>Borrow Date</th>
+                    <th>Due Date</th>
+                    <th>Return Date</th>
+                    <th>Status</th>
+                    <th class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in Model)
+                {
+                    var isOverdue = !b.IsReturned && b.DueDate < DateTime.Today;
+                    <tr class="@(isOverdue ? "table-danger" : "")">
+                        <td>@b.Id</td>
+                        <td>@(b.Book?.Title ?? $"Book #{b.BookId}")</td>
+                        <td>@(b.Reader?.Name ?? $"Reader #{b.ReaderId}")</td>
+                        <td>@b.BorrowDate.ToString("MMM d, yyyy")</td>
+                        <td>@b.DueDate.ToString("MMM d, yyyy")</td>
+                        <td>@(b.ReturnDate.HasValue ? b.ReturnDate.Value.ToString("MMM d, yyyy") : "—")</td>
+                        <td>
+                            @if (b.IsReturned)
+                            {
+                                <span class="badge bg-success">Returned</span>
+                            }
+                            else if (isOverdue)
+                            {
+                                <span class="badge bg-danger">Overdue</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-primary">Active</span>
+                            }
+                        </td>
+                        <td class="text-center">
+                            <a asp-action="Details" asp-route-id="@b.Id" class="btn btn-sm btn-outline-secondary">Details</a>
+                            <a asp-action="Edit"    asp-route-id="@b.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a asp-action="Delete"  asp-route-id="@b.Id" class="btn btn-sm btn-outline-danger">Delete</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

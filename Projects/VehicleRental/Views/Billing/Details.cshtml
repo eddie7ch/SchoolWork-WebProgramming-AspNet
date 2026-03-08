@@ -1,0 +1,50 @@
+@model VehicleRental.Models.Bill
+@{ ViewData["Title"] = "Bill Details"; }
+
+<h2 class="mb-4">Bill #@Model.Id</h2>
+
+<div class="card shadow-sm" style="max-width:500px">
+    <div class="card-header bg-dark text-white">
+        Reservation #@Model.ReservationId —
+        @(Model.Reservation?.Customer?.FullName ?? "")
+    </div>
+    <div class="card-body">
+        @if (Model.Reservation is not null)
+        {
+            <p class="text-muted small mb-3">
+                @(Model.Reservation.Vehicle?.DisplayName) &nbsp;|&nbsp;
+                @Model.Reservation.StartDate.ToString("MMM d") – @Model.Reservation.EndDate.ToString("MMM d, yyyy")
+                (@Model.Reservation.RentalDays days)
+            </p>
+        }
+        <dl class="row mb-0">
+            <dt class="col-sm-6">Base Amount</dt>
+            <dd class="col-sm-6">$@Model.BaseAmount.ToString("N2")</dd>
+
+            <dt class="col-sm-6">Additional Charges</dt>
+            <dd class="col-sm-6">$@Model.AdditionalCharges.ToString("N2")</dd>
+
+            <dt class="col-sm-6">Tax (@Model.TaxRate%)</dt>
+            <dd class="col-sm-6">$@Model.TaxAmount.ToString("N2")</dd>
+
+            <dt class="col-sm-6 fw-bold border-top pt-2">Total</dt>
+            <dd class="col-sm-6 fw-bold border-top pt-2 fs-5">$@Model.TotalAmount.ToString("N2")</dd>
+
+            <dt class="col-sm-6 mt-2">Payment Status</dt>
+            <dd class="col-sm-6 mt-2">
+                @if (Model.IsPaid) { <span class="badge bg-success">Paid</span> }
+                else               { <span class="badge bg-warning text-dark">Unpaid</span> }
+            </dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        @if (!Model.IsPaid)
+        {
+            <form asp-action="MarkPaid" asp-route-id="@Model.Id" method="post">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success btn-sm">Mark as Paid</button>
+            </form>
+        }
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+</div>

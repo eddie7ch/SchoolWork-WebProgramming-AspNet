@@ -1,0 +1,30 @@
+@model VehicleRental.Models.Vehicle
+@{ ViewData["Title"] = "Vehicle Details"; }
+
+<h2 class="mb-4">Vehicle Details</h2>
+
+<div class="card shadow-sm" style="max-width:500px">
+    <div class="card-header bg-dark text-white">@Model.DisplayName</div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-5">Make</dt>           <dd class="col-sm-7">@Model.Make</dd>
+            <dt class="col-sm-5">Model</dt>          <dd class="col-sm-7">@Model.Model</dd>
+            <dt class="col-sm-5">Year</dt>           <dd class="col-sm-7">@Model.Year</dd>
+            <dt class="col-sm-5">License Plate</dt>  <dd class="col-sm-7">@Model.LicensePlate</dd>
+            <dt class="col-sm-5">Type</dt>           <dd class="col-sm-7">@Model.VehicleType</dd>
+            <dt class="col-sm-5">Daily Rate</dt>     <dd class="col-sm-7">$@Model.DailyRate.ToString("N2")</dd>
+            <dt class="col-sm-5">Status</dt>
+            <dd class="col-sm-7">
+                @if (Model.IsAvailable)
+                { <span class="badge bg-success">Available</span> }
+                else
+                { <span class="badge bg-danger">Rented</span> }
+            </dd>
+        </dl>
+    </div>
+    <div class="card-footer d-flex gap-2">
+        <a asp-action="Edit"  asp-route-id="@Model.Id" class="btn btn-primary btn-sm">Edit</a>
+        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger btn-sm">Delete</a>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+</div>

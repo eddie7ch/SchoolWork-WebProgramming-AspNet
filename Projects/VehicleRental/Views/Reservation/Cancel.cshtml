@@ -1,0 +1,19 @@
+@model VehicleRental.Models.Reservation
+@{ ViewData["Title"] = "Cancel Reservation"; }
+
+<h2 class="mb-4">Cancel Reservation</h2>
+
+<div class="alert alert-warning">
+    Are you sure you want to cancel reservation <strong>#@Model.Id</strong>?<br />
+    Customer: <strong>@(Model.Customer?.FullName ?? "—")</strong> |
+    Vehicle: <strong>@(Model.Vehicle?.DisplayName ?? "—")</strong> |
+    Dates: <strong>@Model.StartDate.ToString("MMM d") – @Model.EndDate.ToString("MMM d, yyyy")</strong>
+</div>
+
+<div class="d-flex gap-2">
+    <form asp-action="Cancel" method="post">
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-danger">Yes, Cancel Reservation</button>
+    </form>
+    <a asp-action="Index" class="btn btn-outline-secondary">Go Back</a>
+</div>

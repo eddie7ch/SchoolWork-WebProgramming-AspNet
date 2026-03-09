@@ -1,17 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
+using VehicleRental.Data;
 using VehicleRental.Models;
 
 namespace VehicleRental.Repositories;
 
 public class UserRepository : IUserRepository
 {
-    private static readonly List<User> _users =
-    [
-        new() { Id = 1, Username = "admin", Email = "admin@vrms.com", PasswordHash = Hash("Admin123!") },
-    ];
-
-    private static int _nextId = 2;
+    private readonly AppDbContext _db;
+    public UserRepository(AppDbContext db) => _db = db;
 
     private static string Hash(string password)
     {
@@ -19,23 +16,23 @@ public class UserRepository : IUserRepository
         return Convert.ToHexStringLower(bytes);
     }
 
-    public IEnumerable<User> GetAll() => _users.ToList();
+    public IEnumerable<User> GetAll() => _db.Users.ToList();
 
-    public User? GetById(int id) => _users.FirstOrDefault(u => u.Id == id);
+    public User? GetById(int id) => _db.Users.Find(id);
 
     public User? GetByUsername(string username) =>
-        _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        _db.Users.FirstOrDefault(u => u.Username.ToLower() == username.ToLower());
 
     public bool UsernameExists(string username) =>
-        _users.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        _db.Users.Any(u => u.Username.ToLower() == username.ToLower());
 
     public bool EmailExists(string email) =>
-        _users.Any(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
+        _db.Users.Any(u => u.Email.ToLower() == email.ToLower());
 
     public void Add(User user)
     {
-        user.Id = _nextId++;
-        user.PasswordHash = Hash(user.PasswordHash); // PasswordHash holds plain text before hashing
-        _users.Add(user);
+        user.PasswordHash = Hash(user.PasswordHash);
+        _db.Users.Add(user);
+        _db.SaveChanges();
     }
 }

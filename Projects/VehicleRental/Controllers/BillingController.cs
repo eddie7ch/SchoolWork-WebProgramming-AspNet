@@ -30,33 +30,13 @@ public class BillingController : Controller
         return null!;
     }
 
-    private void PopulateReservationNavProps(Bill bill)
-    {
-        if (bill.Reservation is null) return;
-        bill.Reservation.Customer = _customerRepo.GetById(bill.Reservation.CustomerId);
-        bill.Reservation.Vehicle  = _vehicleRepo.GetById(bill.Reservation.VehicleId);
-    }
-
     // GET: /Billing
     public IActionResult Index()
     {
         var redirect = RequireLogin();
         if (redirect is not null) return redirect;
 
-        var bills = _billRepo.GetAll()
-            .Select(b =>
-            {
-                b.Reservation = _reservationRepo.GetById(b.ReservationId);
-                if (b.Reservation is not null)
-                {
-                    b.Reservation.Customer = _customerRepo.GetById(b.Reservation.CustomerId);
-                    b.Reservation.Vehicle  = _vehicleRepo.GetById(b.Reservation.VehicleId);
-                }
-                return b;
-            })
-            .ToList();
-
-        return View(bills);
+        return View(_billRepo.GetAll().ToList());
     }
 
     // GET: /Billing/Details/5
@@ -67,9 +47,6 @@ public class BillingController : Controller
 
         var bill = _billRepo.GetById(id);
         if (bill is null) return NotFound();
-
-        bill.Reservation = _reservationRepo.GetById(bill.ReservationId);
-        PopulateReservationNavProps(bill);
 
         return View(bill);
     }

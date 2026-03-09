@@ -36,30 +36,17 @@ public class ReportController : Controller
         var redirect = RequireLogin();
         if (redirect is not null) return redirect;
 
-        var reservations = _reservationRepo.GetAll()
-            .Select(r =>
-            {
-                r.Customer = _customerRepo.GetById(r.CustomerId);
-                r.Vehicle  = _vehicleRepo.GetById(r.VehicleId);
-                return r;
-            })
-            .ToList();
+        var reservations = _reservationRepo.GetAll().ToList();
 
-        var bills = _billRepo.GetAll()
-            .Select(b =>
-            {
-                b.Reservation = _reservationRepo.GetById(b.ReservationId);
-                return b;
-            })
-            .ToList();
+        var bills = _billRepo.GetAll().ToList();
 
         var vehicles = _vehicleRepo.GetAll().ToList();
 
         // Revenue by vehicle type
         ViewBag.RevenueByType = bills
-            .Where(b => b.IsPaid && b.Reservation is not null)
-            .GroupBy(b => _vehicleRepo.GetById(b.Reservation!.VehicleId)?.VehicleType)
-            .Select(g => new { Type = g.Key?.ToString() ?? "Unknown", Revenue = g.Sum(b => b.TotalAmount) })
+            .Where(b => b.IsPaid && b.Reservation?.Vehicle is not null)
+            .GroupBy(b => b.Reservation!.Vehicle!.VehicleType)
+            .Select(g => new { Type = g.Key.ToString(), Revenue = g.Sum(b => b.TotalAmount) })
             .ToList();
 
         // Reservations by status
@@ -72,7 +59,7 @@ public class ReportController : Controller
             .GroupBy(r => r.CustomerId)
             .Select(g => new
             {
-                Customer   = _customerRepo.GetById(g.Key)?.FullName ?? "Unknown",
+                Customer   = g.First().Customer?.FullName ?? "Unknown",
                 TotalTrips = g.Count()
             })
             .OrderByDescending(x => x.TotalTrips)

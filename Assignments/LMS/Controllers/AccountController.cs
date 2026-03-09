@@ -1,16 +1,25 @@
+using System.Security.Cryptography;
+using System.Text;
+using LMS.Data;
 using LMS.Models;
-using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class AccountController : Controller
 {
-    private readonly IUserRepository _userRepo;
+    private readonly LmsDbContext _context;
 
-    public AccountController(IUserRepository userRepo)
+    public AccountController(LmsDbContext context)
     {
-        _userRepo = userRepo;
+        _context = context;
+    }
+
+    private static string HashPassword(string password)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     // GET: Account/Login
@@ -29,8 +38,8 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
-        var user = _userRepo.GetByUsername(model.Username);
-        if (user is null || !UserRepository.VerifyPassword(model.Password, user.PasswordHash))
+        var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == model.Username.ToLower());
+        if (user is null || HashPassword(model.Password) != user.PasswordHash)
         {
             ModelState.AddModelError(string.Empty, "Invalid username or password.");
             return View(model);
@@ -57,13 +66,13 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
-        if (_userRepo.UsernameExists(model.Username))
+        if (_context.Users.Any(u => u.Username.ToLower() == model.Username.ToLower()))
         {
             ModelState.AddModelError("Username", "This username is already taken.");
             return View(model);
         }
 
-        if (_userRepo.GetByEmail(model.Email) is not null)
+        if (_context.Users.Any(u => u.Email.ToLower() == model.Email.ToLower()))
         {
             ModelState.AddModelError("Email", "An account with this email already exists.");
             return View(model);
@@ -73,10 +82,11 @@ public class AccountController : Controller
         {
             Username     = model.Username,
             Email        = model.Email,
-            PasswordHash = UserRepository.HashPassword(model.Password)
+            PasswordHash = HashPassword(model.Password)
         };
 
-        _userRepo.Add(user);
+        _context.Users.Add(user);
+        _context.SaveChanges();
         TempData["Success"] = "Account created! Please log in.";
         return RedirectToAction(nameof(Login));
     }

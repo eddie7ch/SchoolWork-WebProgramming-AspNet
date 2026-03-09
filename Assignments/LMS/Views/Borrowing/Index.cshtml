@@ -10,7 +10,19 @@
     <a asp-action="Create" class="btn btn-primary">+ New Borrowing</a>
 </div>
 
-@if (totalOutstanding > 0)
+<!-- Search Bar -->
+<form asp-action="Index" method="get" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="searchString" value="@ViewData["CurrentFilter"]"
+               class="form-control" placeholder="Search by book title, reader name or status..." />
+        <button class="btn btn-outline-primary" type="submit">🔍 Search</button>
+        @if (!string.IsNullOrEmpty(ViewData["CurrentFilter"]?.ToString()))
+        {
+            <a asp-action="Index" class="btn btn-outline-secondary">✕ Clear</a>
+        }
+    </div>
+</form>
+
 {
     <div class="alert alert-warning d-flex align-items-center gap-3">
         <span>⚠️ Total outstanding overdue charges:</span>

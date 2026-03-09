@@ -13,7 +13,7 @@
     <div class="alert alert-danger">
         ⚠️ This borrowing is <strong>overdue by @Model.OverdueDays day(s)</strong>.
         Accumulated fine: <strong class="fs-5">$@Model.OverdueFee.ToString("F2")</strong>
-        (@ $@Borrowing.DailyOverdueFee.ToString("F2")/day)
+        (at $@Borrowing.DailyOverdueFee.ToString("F2")/day)
     </div>
 }
 @if (Model.IsReturned && Model.OverdueFee > 0)

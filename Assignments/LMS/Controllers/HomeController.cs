@@ -1,46 +1,42 @@
 using System.Diagnostics;
+using LMS.Data;
 using LMS.Models;
-using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class HomeController : Controller
 {
-    private readonly IBookRepository      _bookRepo;
-    private readonly IReaderRepository    _readerRepo;
-    private readonly IBorrowingRepository _borrowingRepo;
+    private readonly LmsDbContext _context;
 
-    public HomeController(
-        IBookRepository bookRepo,
-        IReaderRepository readerRepo,
-        IBorrowingRepository borrowingRepo)
+    public HomeController(LmsDbContext context)
     {
-        _bookRepo      = bookRepo;
-        _readerRepo    = readerRepo;
-        _borrowingRepo = borrowingRepo;
+        _context = context;
     }
 
     // GET: /  (Dashboard)
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        var borrowings = _borrowingRepo.GetAll().ToList();
+        ViewBag.TotalBooks        = await _context.Books.CountAsync();
+        ViewBag.AvailableBooks    = await _context.Books.SumAsync(b => b.AvailableCopies);
+        ViewBag.TotalReaders      = await _context.Readers.CountAsync();
+        ViewBag.ActiveBorrowings  = await _context.Borrowings.CountAsync(b => !b.IsReturned);
+        ViewBag.OverdueBorrowings = await _context.Borrowings.CountAsync(b => !b.IsReturned && b.DueDate < DateTime.Today);
 
-        ViewBag.TotalBooks        = _bookRepo.GetAll().Count();
-        ViewBag.AvailableBooks    = _bookRepo.GetAll().Count(b => b.IsAvailable);
-        ViewBag.TotalReaders      = _readerRepo.GetAll().Count();
-        ViewBag.ActiveBorrowings  = borrowings.Count(b => !b.IsReturned);
-        ViewBag.OverdueBorrowings = borrowings.Count(b => !b.IsReturned && b.DueDate < DateTime.Today);
-        ViewBag.OutstandingFees   = borrowings.Where(b => !b.IsReturned).Sum(b => b.OverdueFee);
+        // Outstanding fees require client-side evaluation (computed property)
+        var activeBorrowings = await _context.Borrowings.Where(b => !b.IsReturned).ToListAsync();
+        ViewBag.OutstandingFees = activeBorrowings.Sum(b => b.OverdueFee);
 
-        var recent = borrowings
+        var recent = await _context.Borrowings
+            .Include(b => b.Book)
+            .Include(b => b.Reader)
             .OrderByDescending(b => b.BorrowDate)
             .Take(5)
-            .Select(b => { b.Book = _bookRepo.GetById(b.BookId); b.Reader = _readerRepo.GetById(b.ReaderId); return b; })
-            .ToList();
+            .ToListAsync();
 
         return View(recent);
     }

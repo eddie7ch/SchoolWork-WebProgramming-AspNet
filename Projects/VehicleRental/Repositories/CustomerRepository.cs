@@ -1,45 +1,34 @@
+using VehicleRental.Data;
 using VehicleRental.Models;
 
 namespace VehicleRental.Repositories;
 
 public class CustomerRepository : ICustomerRepository
 {
-    private static readonly List<Customer> _customers =
-    [
-        new() { Id = 1, FirstName = "Alice",  LastName = "Johnson", Email = "alice@email.com",  Phone = "403-555-0101", LicenseNumber = "DL-10023", Address = "123 Main St, Calgary, AB" },
-        new() { Id = 2, FirstName = "Bob",    LastName = "Smith",   Email = "bob@email.com",    Phone = "403-555-0202", LicenseNumber = "DL-20034", Address = "456 Oak Ave, Calgary, AB" },
-        new() { Id = 3, FirstName = "Carol",  LastName = "Williams",Email = "carol@email.com",  Phone = "403-555-0303", LicenseNumber = "DL-30045", Address = "789 Elm Rd, Calgary, AB"  },
-        new() { Id = 4, FirstName = "Daniel", LastName = "Brown",   Email = "daniel@email.com", Phone = "403-555-0404", LicenseNumber = "DL-40056", Address = "101 Pine Blvd, Calgary, AB" },
-    ];
+    private readonly AppDbContext _db;
+    public CustomerRepository(AppDbContext db) => _db = db;
 
-    private static int _nextId = 5;
+    public IEnumerable<Customer> GetAll() => _db.Customers.ToList();
 
-    public IEnumerable<Customer> GetAll() => _customers.ToList();
-
-    public Customer? GetById(int id) => _customers.FirstOrDefault(c => c.Id == id);
+    public Customer? GetById(int id) => _db.Customers.Find(id);
 
     public void Add(Customer customer)
     {
-        customer.Id = _nextId++;
-        _customers.Add(customer);
+        _db.Customers.Add(customer);
+        _db.SaveChanges();
     }
 
     public void Update(Customer customer)
     {
-        var existing = GetById(customer.Id);
-        if (existing is null) return;
-
-        existing.FirstName     = customer.FirstName;
-        existing.LastName      = customer.LastName;
-        existing.Email         = customer.Email;
-        existing.Phone         = customer.Phone;
-        existing.LicenseNumber = customer.LicenseNumber;
-        existing.Address       = customer.Address;
+        _db.Customers.Update(customer);
+        _db.SaveChanges();
     }
 
     public void Delete(int id)
     {
         var customer = GetById(id);
-        if (customer is not null) _customers.Remove(customer);
+        if (customer is null) return;
+        _db.Customers.Remove(customer);
+        _db.SaveChanges();
     }
 }

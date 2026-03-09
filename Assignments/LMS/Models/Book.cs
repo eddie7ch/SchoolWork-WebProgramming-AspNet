@@ -37,4 +37,7 @@ public class Book
 
     // Navigation property
     public ICollection<Borrowing> Borrowings { get; set; } = new List<Borrowing>();
+
+    /// <summary>True when at least one copy is available to borrow.</summary>
+    public bool IsAvailable => AvailableCopies > 0;
 }

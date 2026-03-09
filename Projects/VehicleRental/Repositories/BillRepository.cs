@@ -1,45 +1,52 @@
+using Microsoft.EntityFrameworkCore;
+using VehicleRental.Data;
 using VehicleRental.Models;
 
 namespace VehicleRental.Repositories;
 
 public class BillRepository : IBillRepository
 {
-    private static readonly List<Bill> _bills =
-    [
-        new() { Id = 1, ReservationId = 1, BaseAmount = 270.00m, TaxRate = 10m, AdditionalCharges = 20.00m, IsPaid = true  },
-        new() { Id = 2, ReservationId = 2, BaseAmount = 165.00m, TaxRate = 10m, AdditionalCharges = 0.00m,  IsPaid = false },
-    ];
+    private readonly AppDbContext _db;
+    public BillRepository(AppDbContext db) => _db = db;
 
-    private static int _nextId = 3;
+    public IEnumerable<Bill> GetAll() =>
+        _db.Bills
+           .Include(b => b.Reservation)
+               .ThenInclude(r => r!.Customer)
+           .Include(b => b.Reservation)
+               .ThenInclude(r => r!.Vehicle)
+           .ToList();
 
-    public IEnumerable<Bill> GetAll() => _bills.ToList();
-
-    public Bill? GetById(int id) => _bills.FirstOrDefault(b => b.Id == id);
+    public Bill? GetById(int id) =>
+        _db.Bills
+           .Include(b => b.Reservation)
+               .ThenInclude(r => r!.Customer)
+           .Include(b => b.Reservation)
+               .ThenInclude(r => r!.Vehicle)
+           .FirstOrDefault(b => b.Id == id);
 
     public Bill? GetByReservationId(int reservationId) =>
-        _bills.FirstOrDefault(b => b.ReservationId == reservationId);
+        _db.Bills
+           .Include(b => b.Reservation)
+           .FirstOrDefault(b => b.ReservationId == reservationId);
 
     public void Add(Bill bill)
     {
-        bill.Id = _nextId++;
-        _bills.Add(bill);
+        _db.Bills.Add(bill);
+        _db.SaveChanges();
     }
 
     public void Update(Bill bill)
     {
-        var existing = GetById(bill.Id);
-        if (existing is null) return;
-
-        existing.ReservationId     = bill.ReservationId;
-        existing.BaseAmount        = bill.BaseAmount;
-        existing.TaxRate           = bill.TaxRate;
-        existing.AdditionalCharges = bill.AdditionalCharges;
-        existing.IsPaid            = bill.IsPaid;
+        _db.Bills.Update(bill);
+        _db.SaveChanges();
     }
 
     public void Delete(int id)
     {
-        var bill = GetById(id);
-        if (bill is not null) _bills.Remove(bill);
+        var bill = _db.Bills.Find(id);
+        if (bill is null) return;
+        _db.Bills.Remove(bill);
+        _db.SaveChanges();
     }
 }

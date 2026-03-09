@@ -30,6 +30,9 @@ public class Borrowing
     [Display(Name = "Returned")]
     public bool IsReturned { get; set; } = false;
 
+    [StringLength(20)]
+    public string Status { get; set; } = "Active";
+
     // Navigation properties (resolved manually via repositories)
     public Book? Book { get; set; }
     public Reader? Reader { get; set; }

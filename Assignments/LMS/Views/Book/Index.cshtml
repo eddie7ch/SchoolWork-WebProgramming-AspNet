@@ -8,9 +8,31 @@
     <a asp-action="Create" class="btn btn-primary">+ Add Book</a>
 </div>
 
+<!-- Search Bar -->
+<form asp-action="Index" method="get" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="searchString" value="@ViewData["CurrentFilter"]"
+               class="form-control" placeholder="Search by title, author, ISBN or genre..." />
+        <button class="btn btn-outline-primary" type="submit">🔍 Search</button>
+        @if (!string.IsNullOrEmpty(ViewData["CurrentFilter"]?.ToString()))
+        {
+            <a asp-action="Index" class="btn btn-outline-secondary">✕ Clear</a>
+        }
+    </div>
+</form>
+
 @if (!Model.Any())
 {
-    <div class="alert alert-info">No books found. <a asp-action="Create">Add the first one</a>.</div>
+    <div class="alert alert-info">
+        @if (!string.IsNullOrEmpty(ViewData["CurrentFilter"]?.ToString()))
+        {
+            <text>No books match "<strong>@ViewData["CurrentFilter"]</strong>". <a asp-action="Index">Show all books</a>.</text>
+        }
+        else
+        {
+            <text>No books found. <a asp-action="Create">Add the first one</a>.</text>
+        }
+    </div>
 }
 else
 {
@@ -21,8 +43,10 @@ else
                     <th>#</th>
                     <th>Title</th>
                     <th>Author</th>
+                    <th>Genre</th>
                     <th>ISBN</th>
                     <th>Year</th>
+                    <th>Copies</th>
                     <th>Status</th>
                     <th class="text-center">Actions</th>
                 </tr>
@@ -34,8 +58,10 @@ else
                         <td>@book.Id</td>
                         <td><strong>@book.Title</strong></td>
                         <td>@book.Author</td>
-                        <td><code>@book.ISBN</code></td>
-                        <td>@book.PublishedYear</td>
+                        <td><span class="badge bg-secondary">@(book.Genre ?? "—")</span></td>
+                        <td><code>@(book.ISBN ?? "—")</code></td>
+                        <td>@(book.PublishedYear?.ToString() ?? "—")</td>
+                        <td>@book.AvailableCopies / @book.TotalCopies</td>
                         <td>
                             @if (book.IsAvailable)
                             {
@@ -43,7 +69,7 @@ else
                             }
                             else
                             {
-                                <span class="badge bg-warning text-dark">Borrowed</span>
+                                <span class="badge bg-warning text-dark">Fully Borrowed</span>
                             }
                         </td>
                         <td class="text-center">
@@ -56,4 +82,5 @@ else
             </tbody>
         </table>
     </div>
+    <p class="text-muted small">Showing @Model.Count() book(s)</p>
 }

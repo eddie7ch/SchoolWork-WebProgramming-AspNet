@@ -41,16 +41,10 @@ public class HomeController : Controller
         ViewBag.TotalRevenue        = bills.Where(b => b.IsPaid).Sum(b => b.TotalAmount);
         ViewBag.OutstandingBalance  = bills.Where(b => !b.IsPaid).Sum(b => b.TotalAmount);
 
-        // Recent reservations (last 5)
+        // Recent reservations (last 5) — nav props already loaded by EF Include
         var recent = reservations
             .OrderByDescending(r => r.StartDate)
             .Take(5)
-            .Select(r =>
-            {
-                r.Customer = _customerRepo.GetById(r.CustomerId);
-                r.Vehicle  = _vehicleRepo.GetById(r.VehicleId);
-                return r;
-            })
             .ToList();
 
         return View(recent);

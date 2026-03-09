@@ -47,12 +47,6 @@ public class ReservationController : Controller
         if (redirect is not null) return redirect;
 
         var reservations = _reservationRepo.GetAll()
-            .Select(r =>
-            {
-                r.Customer = _customerRepo.GetById(r.CustomerId);
-                r.Vehicle  = _vehicleRepo.GetById(r.VehicleId);
-                return r;
-            })
             .OrderByDescending(r => r.StartDate)
             .ToList();
 
@@ -68,8 +62,6 @@ public class ReservationController : Controller
         var reservation = _reservationRepo.GetById(id);
         if (reservation is null) return NotFound();
 
-        reservation.Customer = _customerRepo.GetById(reservation.CustomerId);
-        reservation.Vehicle  = _vehicleRepo.GetById(reservation.VehicleId);
         ViewBag.Bill = _billRepo.GetByReservationId(id);
 
         return View(reservation);
@@ -181,8 +173,6 @@ public class ReservationController : Controller
         var reservation = _reservationRepo.GetById(id);
         if (reservation is null) return NotFound();
 
-        reservation.Customer = _customerRepo.GetById(reservation.CustomerId);
-        reservation.Vehicle  = _vehicleRepo.GetById(reservation.VehicleId);
         return View(reservation);
     }
 

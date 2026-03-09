@@ -1,81 +1,65 @@
+using LMS.Data;
 using LMS.Models;
-using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class ReportController : Controller
 {
-    private readonly IBorrowingRepository _borrowingRepo;
-    private readonly IBookRepository      _bookRepo;
-    private readonly IReaderRepository    _readerRepo;
+    private readonly LmsDbContext _context;
 
-    public ReportController(
-        IBorrowingRepository borrowingRepo,
-        IBookRepository bookRepo,
-        IReaderRepository readerRepo)
+    public ReportController(LmsDbContext context)
     {
-        _borrowingRepo = borrowingRepo;
-        _bookRepo      = bookRepo;
-        _readerRepo    = readerRepo;
+        _context = context;
     }
 
-    // Helper: attach navigation properties to a borrowing
-    private Borrowing Populate(Borrowing b)
-    {
-        b.Book   = _bookRepo.GetById(b.BookId);
-        b.Reader = _readerRepo.GetById(b.ReaderId);
-        return b;
-    }
-
-    // ── Report landing page ──────────────────────────────────────────
     // GET: Report
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        var borrowings = _borrowingRepo.GetAll().Select(Populate).ToList();
-        var books      = _bookRepo.GetAll().ToList();
-        var readers    = _readerRepo.GetAll().ToList();
+        var borrowings = await _context.Borrowings
+            .Include(b => b.Book)
+            .Include(b => b.Reader)
+            .ToListAsync();
+        var books   = await _context.Books.ToListAsync();
+        var readers = await _context.Readers.ToListAsync();
 
-        // Summary stats for the report landing page
-        ViewBag.TotalBorrowings       = borrowings.Count;
-        ViewBag.ActiveBorrowings      = borrowings.Count(b => !b.IsReturned);
-        ViewBag.ReturnedBorrowings    = borrowings.Count(b => b.IsReturned);
-        ViewBag.OverdueBorrowings     = borrowings.Count(b => b.IsOverdue);
-        ViewBag.TotalOverdueFees      = borrowings.Sum(b => b.OverdueFee);
-        ViewBag.OutstandingFees       = borrowings.Where(b => !b.IsReturned).Sum(b => b.OverdueFee);
-        ViewBag.TotalBooks            = books.Count;
-        ViewBag.AvailableBooks        = books.Count(b => b.IsAvailable);
-        ViewBag.BorrowedBooks         = books.Count(b => !b.IsAvailable);
-        ViewBag.TotalReaders          = readers.Count;
+        ViewBag.TotalBorrowings    = borrowings.Count;
+        ViewBag.ActiveBorrowings   = borrowings.Count(b => !b.IsReturned);
+        ViewBag.ReturnedBorrowings = borrowings.Count(b => b.IsReturned);
+        ViewBag.OverdueBorrowings  = borrowings.Count(b => b.IsOverdue);
+        ViewBag.TotalOverdueFees   = borrowings.Sum(b => b.OverdueFee);
+        ViewBag.OutstandingFees    = borrowings.Where(b => !b.IsReturned).Sum(b => b.OverdueFee);
+        ViewBag.TotalBooks         = books.Count;
+        ViewBag.AvailableBooks     = books.Count(b => b.IsAvailable);
+        ViewBag.BorrowedBooks      = books.Count(b => !b.IsAvailable);
+        ViewBag.TotalReaders       = readers.Count;
 
-        // Most active reader
         var topReader = borrowings
             .GroupBy(b => b.ReaderId)
             .OrderByDescending(g => g.Count())
             .Select(g => new { ReaderId = g.Key, Count = g.Count() })
             .FirstOrDefault();
-
-        ViewBag.TopReaderName  = topReader is not null ? (_readerRepo.GetById(topReader.ReaderId)?.Name ?? "—") : "—";
+        ViewBag.TopReaderName  = topReader is not null
+            ? (borrowings.FirstOrDefault(b => b.ReaderId == topReader.ReaderId)?.Reader?.Name ?? "N/A") : "N/A";
         ViewBag.TopReaderCount = topReader?.Count ?? 0;
 
-        // Most borrowed book
         var topBook = borrowings
             .GroupBy(b => b.BookId)
             .OrderByDescending(g => g.Count())
             .Select(g => new { BookId = g.Key, Count = g.Count() })
             .FirstOrDefault();
-
-        ViewBag.TopBookTitle = topBook is not null ? (_bookRepo.GetById(topBook.BookId)?.Title ?? "—") : "—";
+        ViewBag.TopBookTitle = topBook is not null
+            ? (borrowings.FirstOrDefault(b => b.BookId == topBook.BookId)?.Book?.Title ?? "N/A") : "N/A";
         ViewBag.TopBookCount = topBook?.Count ?? 0;
 
         return View();
     }
 
-    // ── Borrowing history report ─────────────────────────────────────
     // GET: Report/Borrowings
     public IActionResult Borrowings()
     {
@@ -94,9 +78,11 @@ public class ReportController : Controller
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        var results = _borrowingRepo.GetAll().Select(Populate).AsQueryable();
+        var results = _context.Borrowings
+            .Include(b => b.Book)
+            .Include(b => b.Reader)
+            .AsQueryable();
 
-        // Apply filters
         if (filter.FromDate.HasValue)
             results = results.Where(b => b.BorrowDate.Date >= filter.FromDate.Value.Date);
 
@@ -109,15 +95,18 @@ public class ReportController : Controller
         if (filter.BookId > 0)
             results = results.Where(b => b.BookId == filter.BookId);
 
-        results = filter.Status switch
-        {
-            "active"   => results.Where(b => !b.IsReturned && !b.IsOverdue),
-            "returned" => results.Where(b => b.IsReturned),
-            "overdue"  => results.Where(b => b.IsOverdue),
-            _          => results
-        };
-
         var list = results.OrderByDescending(b => b.BorrowDate).ToList();
+
+        if (!string.IsNullOrEmpty(filter.Status))
+        {
+            list = filter.Status switch
+            {
+                "active"   => list.Where(b => !b.IsReturned && !b.IsOverdue).ToList(),
+                "returned" => list.Where(b => b.IsReturned).ToList(),
+                "overdue"  => list.Where(b => b.IsOverdue).ToList(),
+                _ => list
+            };
+        }
 
         ViewBag.TotalFees = list.Sum(b => b.OverdueFee);
         PopulateDropdowns(filter.ReaderId, filter.BookId);
@@ -132,9 +121,10 @@ public class ReportController : Controller
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        // All borrowings with any overdue charges (active overdue + late returns)
-        var overdue = _borrowingRepo.GetAll()
-            .Select(Populate)
+        var overdue = _context.Borrowings
+            .Include(b => b.Book)
+            .Include(b => b.Reader)
+            .ToList()
             .Where(b => b.OverdueDays > 0)
             .OrderByDescending(b => b.OverdueDays)
             .ToList();
@@ -152,10 +142,9 @@ public class ReportController : Controller
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        var books      = _bookRepo.GetAll().ToList();
-        var borrowings = _borrowingRepo.GetAll().ToList();
+        var books      = _context.Books.ToList();
+        var borrowings = _context.Borrowings.ToList();
 
-        // Borrow count per book
         var borrowCounts = borrowings
             .GroupBy(b => b.BookId)
             .ToDictionary(g => g.Key, g => g.Count());
@@ -170,10 +159,12 @@ public class ReportController : Controller
         if (HttpContext.Session.GetString("Username") is null)
             return RedirectToAction("Login", "Account");
 
-        var readers    = _readerRepo.GetAll().ToList();
-        var borrowings = _borrowingRepo.GetAll().Select(Populate).ToList();
+        var readers    = _context.Readers.ToList();
+        var borrowings = _context.Borrowings
+            .Include(b => b.Book)
+            .Include(b => b.Reader)
+            .ToList();
 
-        // Per-reader stats
         var stats = readers.Select(r => new
         {
             Reader           = r,
@@ -186,16 +177,19 @@ public class ReportController : Controller
         return View(stats);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────
     private void PopulateDropdowns(int readerId = 0, int bookId = 0)
     {
-        var readerItems = _readerRepo.GetAll()
+        var readerItems = _context.Readers
+            .OrderBy(r => r.Name)
             .Select(r => new SelectListItem(r.Name, r.Id.ToString()))
+            .ToList()
             .Prepend(new SelectListItem("All Readers", "0"))
             .ToList();
 
-        var bookItems = _bookRepo.GetAll()
+        var bookItems = _context.Books
+            .OrderBy(b => b.Title)
             .Select(b => new SelectListItem(b.Title, b.Id.ToString()))
+            .ToList()
             .Prepend(new SelectListItem("All Books", "0"))
             .ToList();
 

@@ -1,15 +1,14 @@
-using LMS.Repositories;
+using LMS.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-// Register in-memory repositories as singletons
-builder.Services.AddSingleton<IBookRepository, BookRepository>();
-builder.Services.AddSingleton<IReaderRepository, ReaderRepository>();
-builder.Services.AddSingleton<IBorrowingRepository, BorrowingRepository>();
-builder.Services.AddSingleton<IUserRepository, UserRepository>();
+// Register EF Core DbContext with SQL Server
+builder.Services.AddDbContext<LmsDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("LmsConnection")));
 
 // Session support
 builder.Services.AddDistributedMemoryCache();

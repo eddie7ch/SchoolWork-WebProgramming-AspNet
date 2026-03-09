@@ -78,6 +78,7 @@ public class BorrowingRepository : IBorrowingRepository
         existing.DueDate    = borrowing.DueDate;
         existing.ReturnDate = borrowing.ReturnDate;
         existing.IsReturned = borrowing.IsReturned;
+        existing.Status     = borrowing.Status;
     }
 
     public void Delete(int id)

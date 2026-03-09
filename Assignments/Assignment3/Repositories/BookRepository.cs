@@ -30,11 +30,12 @@ public class BookRepository : IBookRepository
         var existing = GetById(book.Id);
         if (existing is null) return;
 
-        existing.Title          = book.Title;
-        existing.Author         = book.Author;
-        existing.ISBN           = book.ISBN;
-        existing.PublishedYear  = book.PublishedYear;
-        existing.TotalCopies    = book.TotalCopies;
+        existing.Title           = book.Title;
+        existing.Author          = book.Author;
+        existing.ISBN            = book.ISBN;
+        existing.Genre           = book.Genre;
+        existing.PublishedYear   = book.PublishedYear;
+        existing.TotalCopies     = book.TotalCopies;
         existing.AvailableCopies = book.AvailableCopies;
     }
 

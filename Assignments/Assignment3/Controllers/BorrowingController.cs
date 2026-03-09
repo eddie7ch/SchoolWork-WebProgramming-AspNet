@@ -1,75 +1,77 @@
-using LMS.Data;
 using LMS.Models;
+using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class BorrowingController : Controller
 {
-    private readonly LmsDbContext _context;
+    private readonly IBorrowingRepository _borrowings;
+    private readonly IBookRepository _books;
+    private readonly IReaderRepository _readers;
 
-    public BorrowingController(LmsDbContext context)
+    public BorrowingController(IBorrowingRepository borrowings, IBookRepository books, IReaderRepository readers)
     {
-        _context = context;
+        _borrowings = borrowings;
+        _books = books;
+        _readers = readers;
     }
+
+    private bool IsLoggedIn => HttpContext.Session.GetString("Username") is not null;
 
     private void PopulateDropdowns(int? selectedBookId = null, int? selectedReaderId = null)
     {
-        var books = _context.Books
+        var books = _books.GetAll()
             .OrderBy(b => b.Title)
-            .Select(b => new { b.Id, Display = b.Title + " (" + b.AvailableCopies + " available)" })
+            .Select(b => new { b.Id, Display = $"{b.Title} ({b.AvailableCopies} available)" })
             .ToList();
         ViewBag.BookId   = new SelectList(books, "Id", "Display", selectedBookId);
-        ViewBag.ReaderId = new SelectList(_context.Readers.OrderBy(r => r.Name), "Id", "Name", selectedReaderId);
+        ViewBag.ReaderId = new SelectList(_readers.GetAll().OrderBy(r => r.Name), "Id", "Name", selectedReaderId);
+    }
+
+    private void ResolveNavProperties(IEnumerable<Borrowing> borrowings)
+    {
+        foreach (var b in borrowings)
+        {
+            b.Book   ??= _books.GetById(b.BookId);
+            b.Reader ??= _readers.GetById(b.ReaderId);
+        }
     }
 
     // GET: Borrowing
-    public async Task<IActionResult> Index(string? searchString)
+    public IActionResult Index(string? searchString)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
         ViewData["CurrentFilter"] = searchString;
-
-        var borrowings = _context.Borrowings
-            .Include(b => b.Book)
-            .Include(b => b.Reader)
-            .AsQueryable();
+        var borrowings = _borrowings.GetAll().ToList();
+        ResolveNavProperties(borrowings);
 
         if (!string.IsNullOrWhiteSpace(searchString))
-        {
             borrowings = borrowings.Where(b =>
-                (b.Book != null && b.Book.Title.Contains(searchString)) ||
-                (b.Reader != null && b.Reader.Name.Contains(searchString)) ||
-                b.Status.Contains(searchString));
-        }
+                (b.Book?.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) ||
+                (b.Reader?.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) ||
+                b.Status.Contains(searchString, StringComparison.OrdinalIgnoreCase)).ToList();
 
-        return View(await borrowings.OrderByDescending(b => b.BorrowDate).ToListAsync());
+        return View(borrowings.OrderByDescending(b => b.BorrowDate).ToList());
     }
 
     // GET: Borrowing/Details/5
-    public async Task<IActionResult> Details(int id)
+    public IActionResult Details(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var borrowing = await _context.Borrowings
-            .Include(b => b.Book)
-            .Include(b => b.Reader)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var borrowing = _borrowings.GetById(id);
         if (borrowing is null) return NotFound();
+        borrowing.Book   ??= _books.GetById(borrowing.BookId);
+        borrowing.Reader ??= _readers.GetById(borrowing.ReaderId);
         return View(borrowing);
     }
 
     // GET: Borrowing/Create
     public IActionResult Create()
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         PopulateDropdowns();
         return View(new Borrowing { BorrowDate = DateTime.Today, DueDate = DateTime.Today.AddDays(14) });
     }
@@ -77,10 +79,9 @@ public class BorrowingController : Controller
     // POST: Borrowing/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create([Bind("BookId,ReaderId,BorrowDate,DueDate,Notes")] Borrowing borrowing)
+    public IActionResult Create([Bind("BookId,ReaderId,BorrowDate,DueDate")] Borrowing borrowing)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
         ModelState.Remove(nameof(Borrowing.Book));
         ModelState.Remove(nameof(Borrowing.Reader));
@@ -91,7 +92,7 @@ public class BorrowingController : Controller
             return View(borrowing);
         }
 
-        var book = await _context.Books.FindAsync(borrowing.BookId);
+        var book = _books.GetById(borrowing.BookId);
         if (book is null || book.AvailableCopies < 1)
         {
             ModelState.AddModelError("BookId", "The selected book has no available copies.");
@@ -102,41 +103,27 @@ public class BorrowingController : Controller
         book.AvailableCopies--;
         borrowing.IsReturned = false;
         borrowing.Status = "Active";
-
-        _context.Borrowings.Add(borrowing);
-        await _context.SaveChangesAsync();
-
+        _borrowings.Add(borrowing);
         TempData["Success"] = "Borrowing record created successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Borrowing/Edit/5
-    public async Task<IActionResult> Edit(int id)
+    public IActionResult Edit(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var borrowing = await _context.Borrowings.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var borrowing = _borrowings.GetById(id);
         if (borrowing is null) return NotFound();
-
-        var books = _context.Books
-            .OrderBy(b => b.Title)
-            .Select(b => new { b.Id, Display = b.Title + " (" + b.AvailableCopies + " available)" })
-            .ToList();
-        ViewBag.BookId   = new SelectList(books, "Id", "Display", borrowing.BookId);
-        ViewBag.ReaderId = new SelectList(_context.Readers.OrderBy(r => r.Name), "Id", "Name", borrowing.ReaderId);
-
+        PopulateDropdowns(borrowing.BookId, borrowing.ReaderId);
         return View(borrowing);
     }
 
     // POST: Borrowing/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,BookId,ReaderId,BorrowDate,DueDate,ReturnDate,IsReturned,Status")] Borrowing borrowing)
+    public IActionResult Edit(int id, [Bind("Id,BookId,ReaderId,BorrowDate,DueDate,ReturnDate,IsReturned,Status")] Borrowing borrowing)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         if (id != borrowing.Id) return BadRequest();
 
         ModelState.Remove(nameof(Borrowing.Book));
@@ -144,24 +131,17 @@ public class BorrowingController : Controller
 
         if (!ModelState.IsValid)
         {
-            var books = _context.Books
-                .OrderBy(b => b.Title)
-                .Select(b => new { b.Id, Display = b.Title + " (" + b.AvailableCopies + " available)" })
-                .ToList();
-            ViewBag.BookId   = new SelectList(books, "Id", "Display", borrowing.BookId);
-            ViewBag.ReaderId = new SelectList(_context.Readers.OrderBy(r => r.Name), "Id", "Name", borrowing.ReaderId);
+            PopulateDropdowns(borrowing.BookId, borrowing.ReaderId);
             return View(borrowing);
         }
 
-        var existing = await _context.Borrowings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        var existing = _borrowings.GetById(id);
         if (existing is null) return NotFound();
 
-        // If returning the book, restore availability
         if (borrowing.IsReturned && !existing.IsReturned)
         {
-            var book = await _context.Books.FindAsync(borrowing.BookId);
+            var book = _books.GetById(borrowing.BookId);
             if (book is not null) book.AvailableCopies++;
-
             if (borrowing.ReturnDate is null) borrowing.ReturnDate = DateTime.Today;
             borrowing.Status = "Returned";
         }
@@ -170,56 +150,37 @@ public class BorrowingController : Controller
             borrowing.Status = borrowing.DueDate < DateTime.Today ? "Overdue" : "Active";
         }
 
-        try
-        {
-            _context.Update(borrowing);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = "Borrowing record updated successfully.";
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!await _context.Borrowings.AnyAsync(b => b.Id == id)) return NotFound();
-            throw;
-        }
-
+        _borrowings.Update(borrowing);
+        TempData["Success"] = "Borrowing record updated successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Borrowing/Delete/5
-    public async Task<IActionResult> Delete(int id)
+    public IActionResult Delete(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var borrowing = await _context.Borrowings
-            .Include(b => b.Book)
-            .Include(b => b.Reader)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var borrowing = _borrowings.GetById(id);
         if (borrowing is null) return NotFound();
+        borrowing.Book   ??= _books.GetById(borrowing.BookId);
+        borrowing.Reader ??= _readers.GetById(borrowing.ReaderId);
         return View(borrowing);
     }
 
     // POST: Borrowing/Delete/5
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public IActionResult DeleteConfirmed(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var borrowing = await _context.Borrowings.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var borrowing = _borrowings.GetById(id);
         if (borrowing is not null)
         {
-            // Restore book availability if not yet returned
             if (!borrowing.IsReturned)
             {
-                var book = await _context.Books.FindAsync(borrowing.BookId);
+                var book = _books.GetById(borrowing.BookId);
                 if (book is not null) book.AvailableCopies++;
             }
-
-            _context.Borrowings.Remove(borrowing);
-            await _context.SaveChangesAsync();
+            _borrowings.Delete(id);
             TempData["Success"] = "Borrowing record deleted successfully.";
         }
         return RedirectToAction(nameof(Index));

@@ -1,87 +1,83 @@
-using LMS.Data;
 using LMS.Models;
+using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class ReaderController : Controller
 {
-    private readonly LmsDbContext _context;
+    private readonly IReaderRepository _readers;
+    private readonly IBorrowingRepository _borrowings;
+    private readonly IBookRepository _books;
 
-    public ReaderController(LmsDbContext context)
+    public ReaderController(IReaderRepository readers, IBorrowingRepository borrowings, IBookRepository books)
     {
-        _context = context;
+        _readers = readers;
+        _borrowings = borrowings;
+        _books = books;
     }
 
+    private bool IsLoggedIn => HttpContext.Session.GetString("Username") is not null;
+
     // GET: Reader
-    public async Task<IActionResult> Index(string? searchString)
+    public IActionResult Index(string? searchString)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
         ViewData["CurrentFilter"] = searchString;
-
-        var readers = _context.Readers.AsQueryable();
+        var readers = _readers.GetAll();
 
         if (!string.IsNullOrWhiteSpace(searchString))
-        {
             readers = readers.Where(r =>
-                r.Name.Contains(searchString) ||
-                r.Email.Contains(searchString) ||
-                (r.Phone != null && r.Phone.Contains(searchString)));
-        }
+                r.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                r.Email.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                (r.Phone != null && r.Phone.Contains(searchString, StringComparison.OrdinalIgnoreCase)));
 
-        return View(await readers.OrderBy(r => r.Name).ToListAsync());
+        return View(readers.OrderBy(r => r.Name).ToList());
     }
 
     // GET: Reader/Details/5
-    public async Task<IActionResult> Details(int id)
+    public IActionResult Details(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
-        var reader = await _context.Readers
-            .Include(r => r.Borrowings)
-                .ThenInclude(b => b.Book)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
+        var reader = _readers.GetById(id);
         if (reader is null) return NotFound();
+
+        // Manually populate borrowing history for this reader
+        var borrowings = _borrowings.GetAll().Where(b => b.ReaderId == id).ToList();
+        foreach (var b in borrowings)
+            b.Book ??= _books.GetById(b.BookId);
+        reader.Borrowings = borrowings;
+
         return View(reader);
     }
 
     // GET: Reader/Create
     public IActionResult Create()
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         return View();
     }
 
     // POST: Reader/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create([Bind("Name,Email,Phone,MemberSince")] Reader reader)
+    public IActionResult Create([Bind("Name,Email,Phone,MemberSince")] Reader reader)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         if (!ModelState.IsValid) return View(reader);
 
-        _context.Readers.Add(reader);
-        await _context.SaveChangesAsync();
+        _readers.Add(reader);
         TempData["Success"] = $"Reader \"{reader.Name}\" added successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Reader/Edit/5
-    public async Task<IActionResult> Edit(int id)
+    public IActionResult Edit(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var reader = await _context.Readers.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var reader = _readers.GetById(id);
         if (reader is null) return NotFound();
         return View(reader);
     }
@@ -89,36 +85,22 @@ public class ReaderController : Controller
     // POST: Reader/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Email,Phone,MemberSince")] Reader reader)
+    public IActionResult Edit(int id, [Bind("Id,Name,Email,Phone,MemberSince")] Reader reader)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         if (id != reader.Id) return BadRequest();
         if (!ModelState.IsValid) return View(reader);
 
-        try
-        {
-            _context.Update(reader);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = $"Reader \"{reader.Name}\" updated successfully.";
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!await _context.Readers.AnyAsync(r => r.Id == id)) return NotFound();
-            throw;
-        }
-
+        _readers.Update(reader);
+        TempData["Success"] = $"Reader \"{reader.Name}\" updated successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Reader/Delete/5
-    public async Task<IActionResult> Delete(int id)
+    public IActionResult Delete(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var reader = await _context.Readers.FirstOrDefaultAsync(m => m.Id == id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var reader = _readers.GetById(id);
         if (reader is null) return NotFound();
         return View(reader);
     }
@@ -126,16 +108,13 @@ public class ReaderController : Controller
     // POST: Reader/Delete/5
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public IActionResult DeleteConfirmed(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var reader = await _context.Readers.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var reader = _readers.GetById(id);
         if (reader is not null)
         {
-            _context.Readers.Remove(reader);
-            await _context.SaveChangesAsync();
+            _readers.Delete(id);
             TempData["Success"] = $"Reader \"{reader.Name}\" deleted successfully.";
         }
         return RedirectToAction(nameof(Index));

@@ -1,33 +1,20 @@
-using System.Security.Cryptography;
-using System.Text;
-using LMS.Data;
 using LMS.Models;
+using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class AccountController : Controller
 {
-    private readonly LmsDbContext _context;
+    private readonly IUserRepository _users;
 
-    public AccountController(LmsDbContext context)
-    {
-        _context = context;
-    }
-
-    private static string HashPassword(string password)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    public AccountController(IUserRepository users) => _users = users;
 
     // GET: Account/Login
     public IActionResult Login()
     {
         if (HttpContext.Session.GetString("Username") is not null)
             return RedirectToAction("Index", "Home");
-
         return View();
     }
 
@@ -38,8 +25,8 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
-        var user = _context.Users.FirstOrDefault(u => u.Username.ToLower() == model.Username.ToLower());
-        if (user is null || HashPassword(model.Password) != user.PasswordHash)
+        var user = _users.GetByUsername(model.Username);
+        if (user is null || !UserRepository.VerifyPassword(model.Password, user.PasswordHash))
         {
             ModelState.AddModelError(string.Empty, "Invalid username or password.");
             return View(model);
@@ -55,7 +42,6 @@ public class AccountController : Controller
     {
         if (HttpContext.Session.GetString("Username") is not null)
             return RedirectToAction("Index", "Home");
-
         return View();
     }
 
@@ -66,27 +52,25 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
-        if (_context.Users.Any(u => u.Username.ToLower() == model.Username.ToLower()))
+        if (_users.UsernameExists(model.Username))
         {
             ModelState.AddModelError("Username", "This username is already taken.");
             return View(model);
         }
 
-        if (_context.Users.Any(u => u.Email.ToLower() == model.Email.ToLower()))
+        if (_users.GetByEmail(model.Email) is not null)
         {
             ModelState.AddModelError("Email", "An account with this email already exists.");
             return View(model);
         }
 
-        var user = new User
+        _users.Add(new User
         {
             Username     = model.Username,
             Email        = model.Email,
-            PasswordHash = HashPassword(model.Password)
-        };
+            PasswordHash = UserRepository.HashPassword(model.Password)
+        });
 
-        _context.Users.Add(user);
-        _context.SaveChanges();
         TempData["Success"] = "Account created! Please log in.";
         return RedirectToAction(nameof(Login));
     }

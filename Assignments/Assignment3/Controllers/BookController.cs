@@ -1,88 +1,85 @@
-using LMS.Data;
 using LMS.Models;
+using LMS.Repositories;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LMS.Controllers;
 
 public class BookController : Controller
 {
-    private readonly LmsDbContext _context;
+    private readonly IBookRepository _books;
+    private readonly IBorrowingRepository _borrowings;
+    private readonly IReaderRepository _readers;
 
-    public BookController(LmsDbContext context)
+    public BookController(IBookRepository books, IBorrowingRepository borrowings, IReaderRepository readers)
     {
-        _context = context;
+        _books = books;
+        _borrowings = borrowings;
+        _readers = readers;
     }
 
+    private bool IsLoggedIn => HttpContext.Session.GetString("Username") is not null;
+
     // GET: Book
-    public async Task<IActionResult> Index(string? searchString)
+    public IActionResult Index(string? searchString)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
         ViewData["CurrentFilter"] = searchString;
 
-        var books = _context.Books.AsQueryable();
+        var books = _books.GetAll();
 
         if (!string.IsNullOrWhiteSpace(searchString))
-        {
             books = books.Where(b =>
-                b.Title.Contains(searchString) ||
-                b.Author.Contains(searchString) ||
-                (b.ISBN != null && b.ISBN.Contains(searchString)) ||
-                (b.Genre != null && b.Genre.Contains(searchString)));
-        }
+                b.Title.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                b.Author.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                (b.ISBN != null && b.ISBN.Contains(searchString, StringComparison.OrdinalIgnoreCase)) ||
+                (b.Genre != null && b.Genre.Contains(searchString, StringComparison.OrdinalIgnoreCase)));
 
-        return View(await books.OrderBy(b => b.Title).ToListAsync());
+        return View(books.OrderBy(b => b.Title).ToList());
     }
 
     // GET: Book/Details/5
-    public async Task<IActionResult> Details(int id)
+    public IActionResult Details(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
-        var book = await _context.Books
-            .Include(b => b.Borrowings)
-                .ThenInclude(br => br.Reader)
-            .FirstOrDefaultAsync(m => m.Id == id);
-
+        var book = _books.GetById(id);
         if (book is null) return NotFound();
+
+        // Manually populate borrowing history for this book
+        var borrowings = _borrowings.GetAll().Where(b => b.BookId == id).ToList();
+        foreach (var b in borrowings)
+            b.Reader ??= _readers.GetById(b.ReaderId);
+        book.Borrowings = borrowings;
+
         return View(book);
     }
 
     // GET: Book/Create
     public IActionResult Create()
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         return View();
     }
 
     // POST: Book/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create([Bind("Title,Author,ISBN,Genre,PublishedYear,TotalCopies,AvailableCopies")] Book book)
+    public IActionResult Create([Bind("Title,Author,ISBN,Genre,PublishedYear,TotalCopies,AvailableCopies")] Book book)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         if (!ModelState.IsValid) return View(book);
 
-        _context.Books.Add(book);
-        await _context.SaveChangesAsync();
+        _books.Add(book);
         TempData["Success"] = $"Book \"{book.Title}\" added successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Book/Edit/5
-    public async Task<IActionResult> Edit(int id)
+    public IActionResult Edit(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var book = await _context.Books.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var book = _books.GetById(id);
         if (book is null) return NotFound();
         return View(book);
     }
@@ -90,36 +87,23 @@ public class BookController : Controller
     // POST: Book/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,Title,Author,ISBN,Genre,PublishedYear,TotalCopies,AvailableCopies")] Book book)
+    public IActionResult Edit(int id, [Bind("Id,Title,Author,ISBN,Genre,PublishedYear,TotalCopies,AvailableCopies")] Book book)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
         if (id != book.Id) return BadRequest();
         if (!ModelState.IsValid) return View(book);
 
-        try
-        {
-            _context.Update(book);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = $"Book \"{book.Title}\" updated successfully.";
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            if (!await _context.Books.AnyAsync(b => b.Id == id)) return NotFound();
-            throw;
-        }
-
+        _books.Update(book);
+        TempData["Success"] = $"Book \"{book.Title}\" updated successfully.";
         return RedirectToAction(nameof(Index));
     }
 
     // GET: Book/Delete/5
-    public async Task<IActionResult> Delete(int id)
+    public IActionResult Delete(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
 
-        var book = await _context.Books.FirstOrDefaultAsync(m => m.Id == id);
+        var book = _books.GetById(id);
         if (book is null) return NotFound();
         return View(book);
     }
@@ -127,16 +111,13 @@ public class BookController : Controller
     // POST: Book/Delete/5
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public IActionResult DeleteConfirmed(int id)
     {
-        if (HttpContext.Session.GetString("Username") is null)
-            return RedirectToAction("Login", "Account");
-
-        var book = await _context.Books.FindAsync(id);
+        if (!IsLoggedIn) return RedirectToAction("Login", "Account");
+        var book = _books.GetById(id);
         if (book is not null)
         {
-            _context.Books.Remove(book);
-            await _context.SaveChangesAsync();
+            _books.Delete(id);
             TempData["Success"] = $"Book \"{book.Title}\" deleted successfully.";
         }
         return RedirectToAction(nameof(Index));

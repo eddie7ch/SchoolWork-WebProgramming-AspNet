@@ -1,0 +1,127 @@
+# Contributing Guide — Zoubera Issaka
+
+Hi Zoubera! This guide will help you get set up and understand what you need to work on.
+
+## Your Branch
+
+Your branch is **`zoubera-dev`**. Always work here — never directly on `main`.
+
+```bash
+# Clone the repo (first time only)
+git clone https://github.com/bvc-g9-vehicle-rental/Vehicle-Rental-Management-System.git
+cd Vehicle-Rental-Management-System
+
+# Switch to your branch
+git checkout zoubera-dev
+```
+
+## Running the App Locally
+
+You need: [.NET 9 SDK](https://dotnet.microsoft.com/download) + [SQL Server LocalDB](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/sql-server-express-localdb)
+
+```bash
+dotnet run
+```
+
+Then open `http://localhost:5254` in your browser.
+
+Or just use the live app: **[https://vehicle-rental-app.azurewebsites.net](https://vehicle-rental-app.azurewebsites.net)**
+
+---
+
+## Project Structure (what matters for you)
+
+```
+VehicleRental/
+├── Views/                        ← YOUR MAIN FOCUS
+│   ├── Shared/
+│   │   └── _Layout.cshtml        ← Master layout (navbar, footer — shared by ALL pages)
+│   ├── Account/
+│   │   ├── Login.cshtml          ← Login page
+│   │   └── Register.cshtml       ← Register page
+│   ├── Home/
+│   │   └── Index.cshtml          ← Dashboard page
+│   ├── Vehicle/
+│   │   ├── Index.cshtml          ← Vehicle list
+│   │   ├── Create.cshtml         ← Add vehicle form
+│   │   ├── Edit.cshtml           ← Edit vehicle form
+│   │   ├── Details.cshtml        ← Vehicle details
+│   │   └── Delete.cshtml         ← Delete confirmation
+│   ├── Customer/                 ← Same structure as Vehicle
+│   ├── Reservation/              ← Same structure as Vehicle + Cancel.cshtml
+│   ├── Billing/
+│   │   ├── Index.cshtml          ← Billing list
+│   │   └── Details.cshtml        ← Bill details
+│   └── Report/
+│       └── Index.cshtml          ← Reports page
+│
+├── wwwroot/                      ← Static files (CSS, JS, images)
+│   └── css/
+│       └── site.css              ← Global custom styles
+│
+├── Controllers/                  ← Eddie's code — connects data to views (read only)
+├── Models/                       ← Eddie's code — database models (read only)
+└── Repositories/                 ← Eddie's code — data access (read only)
+```
+
+---
+
+## How Views Work (quick explanation)
+
+Each page is a `.cshtml` file — it's HTML with some C# mixed in using `@`.
+
+Example from `Views/Vehicle/Index.cshtml`:
+```html
+@model IEnumerable<VehicleRental.Models.Vehicle>  <!-- data passed from controller -->
+
+<h2>Vehicles</h2>
+<table class="table">
+    @foreach (var v in Model) {   <!-- loop through vehicles -->
+        <tr>
+            <td>@v.Make</td>      <!-- output a value -->
+            <td>@v.Model</td>
+        </tr>
+    }
+</table>
+```
+
+The **controller** fetches data from the database and passes it to the view. You don't need to touch the controllers — just focus on how the data looks in the view.
+
+---
+
+## The Shared Layout
+
+**`Views/Shared/_Layout.cshtml`** is the master template — the navbar and overall page structure lives here. Every other page is injected into it via `@RenderBody()`. If you want to change the navbar or add something that appears on every page, edit this file.
+
+Bootstrap 5 is already included via CDN in `_Layout.cshtml`.
+
+---
+
+## What You Can Work On
+
+- Improve the styling of any page in `Views/`
+- Make pages more responsive (mobile-friendly)
+- Improve the navbar in `_Layout.cshtml`
+- Add better form validation messages
+- Improve the Dashboard (`Views/Home/Index.cshtml`) layout
+- Add success/error alert styling
+- Any UI improvements you think would look better
+
+---
+
+## Saving Your Work
+
+```bash
+# After making changes
+git add .
+git commit -m "ui: improve dashboard layout"
+git push origin zoubera-dev
+```
+
+Use clear commit messages starting with `ui:` or `style:` so it's easy to see what you changed.
+
+---
+
+## Questions?
+
+Message Eddie on Teams/WhatsApp — or check the live app at [https://vehicle-rental-app.azurewebsites.net](https://vehicle-rental-app.azurewebsites.net) to see how things currently look.

@@ -50,7 +50,7 @@
         <div class="card h-100 border-danger">
             <div class="card-body">
                 <div class="text-muted small">💰 Outstanding Fines</div>
-                <div class="display-6 fw-bold text-danger">$@((decimal)ViewBag.OutstandingFees).ToString("F2")</div>
+                <div class="display-6 fw-bold text-danger">$@(((decimal)ViewBag.OutstandingFees).ToString("F2"))</div>
                 @if ((decimal)ViewBag.OutstandingFees > 0)
                 {
                     <a asp-controller="Report" asp-action="Overdue" class="btn btn-sm btn-outline-danger mt-1">View</a>
@@ -111,9 +111,20 @@ else
                         <td>@b.BorrowDate.ToString("MMM d, yyyy")</td>
                         <td>@b.DueDate.ToString("MMM d, yyyy")</td>
                         <td>
-                            @if (b.IsReturned)      { <span class="badge bg-success">Returned</span> }
-                            else if (isOverdue)     { <span class="badge bg-danger">Overdue</span> }
-                            else                    { <span class="badge bg-primary">Active</span> }
+                            @if (b.IsReturned)
+                            {
+                                <span class="badge bg-success">Returned</span>
+                            }
+                            else if (isOverdue)
+                            {
+
+                                <span class="badge bg-danger">Overdue</span>
+                            }
+                            else
+                            {
+
+                                <span class="badge bg-primary">Active</span>
+                            }
                         </td>
                     </tr>
                 }
@@ -122,4 +133,3 @@ else
     </div>
     <a asp-controller="Borrowing" asp-action="Index" class="btn btn-sm btn-outline-secondary">View all borrowings →</a>
 }
-

@@ -1,0 +1,39 @@
+{
+    "info": {
+        "name": "Assignment 2 - Library API",
+        "_postman_id": "a2-library-api",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "BOOK",
+            "item": [
+                { "name": "1. GET all books", "request": { "method": "GET", "url": "http://localhost:5157/api/book" } },
+                { "name": "2. GET book by ID", "request": { "method": "GET", "url": "http://localhost:5157/api/book/1" } },
+                { "name": "3. POST create book", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Test Book\",\n  \"author\": \"Test Author\",\n  \"isbn\": \"1234567890\",\n  \"genre\": \"Fiction\",\n  \"totalCopies\": 2,\n  \"availableCopies\": 2,\n  \"publishedDate\": \"2020-01-01\",\n  \"publisher\": \"Test Pub\"\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/book" } },
+                { "name": "4. PUT update book", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"id\": 1,\n  \"title\": \"Updated Gatsby\",\n  \"author\": \"F. Scott Fitzgerald\",\n  \"isbn\": \"9780743273565\",\n  \"genre\": \"Fiction\",\n  \"totalCopies\": 5,\n  \"availableCopies\": 3,\n  \"publishedDate\": \"1925-04-10\",\n  \"publisher\": \"Scribner\"\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/book/1" } },
+                { "name": "5. DELETE book", "request": { "method": "DELETE", "url": "http://localhost:5157/api/book/1" } }
+            ]
+        },
+        {
+            "name": "READER",
+            "item": [
+                { "name": "6. GET all readers", "request": { "method": "GET", "url": "http://localhost:5157/api/reader" } },
+                { "name": "7. GET reader by ID", "request": { "method": "GET", "url": "http://localhost:5157/api/reader/1" } },
+                { "name": "8. POST create reader", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane@example.com\",\n  \"phoneNumber\": \"555-1234\",\n  \"membershipNumber\": \"M1234\",\n  \"membershipStartDate\": \"2024-01-01\",\n  \"membershipExpiryDate\": \"2026-01-01\",\n  \"address\": \"123 Main St\",\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/reader" } },
+                { "name": "9. PUT update reader", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"id\": 1,\n  \"firstName\": \"Alice Updated\",\n  \"lastName\": \"Johnson\",\n  \"email\": \"alice.johnson@email.com\",\n  \"phoneNumber\": \"403-555-1001\",\n  \"membershipNumber\": \"MEM0001\",\n  \"membershipStartDate\": \"2024-01-15\",\n  \"membershipExpiryDate\": \"2026-01-15\",\n  \"address\": \"999 New St, Calgary, AB\",\n  \"isActive\": true\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/reader/1" } },
+                { "name": "10. DELETE reader", "request": { "method": "DELETE", "url": "http://localhost:5157/api/reader/1" } }
+            ]
+        },
+        {
+            "name": "BORROWING",
+            "item": [
+                { "name": "11. GET all borrowings", "request": { "method": "GET", "url": "http://localhost:5157/api/borrowing" } },
+                { "name": "12. GET borrowing by ID", "request": { "method": "GET", "url": "http://localhost:5157/api/borrowing/1" } },
+                { "name": "13. POST create borrowing", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"bookId\": 2,\n  \"readerId\": 2,\n  \"borrowDate\": \"2026-03-13\",\n  \"dueDate\": \"2026-03-27\",\n  \"isReturned\": false,\n  \"overdueCharge\": 0,\n  \"notes\": \"New borrowing\"\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/borrowing" } },
+                { "name": "14. PUT update borrowing", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"id\": 1,\n  \"bookId\": 1,\n  \"readerId\": 1,\n  \"borrowDate\": \"2026-01-10\",\n  \"dueDate\": \"2026-01-24\",\n  \"returnDate\": \"2026-01-20\",\n  \"isReturned\": true,\n  \"overdueCharge\": 0,\n  \"notes\": \"Returned early\"\n}", "options": { "raw": { "language": "json" } } }, "url": "http://localhost:5157/api/borrowing/1" } },
+                { "name": "15. DELETE borrowing", "request": { "method": "DELETE", "url": "http://localhost:5157/api/borrowing/1" } }
+            ]
+        }
+    ]
+}

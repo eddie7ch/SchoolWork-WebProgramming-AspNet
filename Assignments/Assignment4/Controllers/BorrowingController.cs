@@ -21,7 +21,7 @@ public class BorrowingController : Controller
             .OrderBy(b => b.Title)
             .Select(b => new { b.Id, Display = b.Title + " (" + b.AvailableCopies + " available)" })
             .ToList();
-        ViewBag.BookId   = new SelectList(books, "Id", "Display", selectedBookId);
+        ViewBag.BookId = new SelectList(books, "Id", "Display", selectedBookId);
         ViewBag.ReaderId = new SelectList(_context.Readers.OrderBy(r => r.Name), "Id", "Name", selectedReaderId);
     }
 
@@ -76,13 +76,15 @@ public class BorrowingController : Controller
             return View(borrowing);
         }
 
-        // Decrement available copies
         var book = await _context.Books.FindAsync(borrowing.BookId);
-        if (book is not null && book.AvailableCopies > 0)
+        if (book is null || book.AvailableCopies <= 0)
         {
-            book.AvailableCopies--;
+            ModelState.AddModelError("BookId", "This book has no available copies.");
+            PopulateDropdowns(borrowing.BookId, borrowing.ReaderId);
+            return View(borrowing);
         }
 
+        book.AvailableCopies--;
         borrowing.Status = "Active";
         borrowing.IsReturned = false;
         _context.Borrowings.Add(borrowing);
@@ -114,17 +116,30 @@ public class BorrowingController : Controller
 
         try
         {
-            // If marking as returned, restore available copies and set return date
-            if (borrowing.IsReturned && borrowing.ReturnDate is null)
+            // Load original DB state to compare returned status
+            var original = await _context.Borrowings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+            if (original is null) return NotFound();
+
+            if (borrowing.IsReturned)
             {
-                borrowing.ReturnDate = DateTime.Today;
+                if (borrowing.ReturnDate is null) borrowing.ReturnDate = DateTime.Today;
                 borrowing.Status = "Returned";
-                var book = await _context.Books.FindAsync(borrowing.BookId);
-                if (book is not null) book.AvailableCopies++;
+                // Restore copy only if it wasn't already marked returned
+                if (!original.IsReturned)
+                {
+                    var book = await _context.Books.FindAsync(borrowing.BookId);
+                    if (book is not null) book.AvailableCopies++;
+                }
             }
-            else if (!borrowing.IsReturned && DateTime.Today > borrowing.DueDate)
+            else
             {
-                borrowing.Status = "Overdue";
+                // If it was returned before but is now un-returned, take back a copy
+                if (original.IsReturned)
+                {
+                    var book = await _context.Books.FindAsync(borrowing.BookId);
+                    if (book is not null && book.AvailableCopies > 0) book.AvailableCopies--;
+                }
+                borrowing.Status = DateTime.Today > borrowing.DueDate ? "Overdue" : "Active";
             }
 
             _context.Update(borrowing);

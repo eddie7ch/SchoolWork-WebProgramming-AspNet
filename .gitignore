@@ -64,3 +64,6 @@ $RECYCLE.BIN/
 *.zip
 
 COURSE-INSTRUCTIONS-ALL-ASSIGNMENTS.md
+
+# Video files (too large for GitHub)
+*.mp4
